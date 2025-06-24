@@ -39,26 +39,32 @@ def _is_safe_to_reinplace(
     # There is probably a faster way to do this but this works for now.
     if node in later_nodes:
         return False
-    
+
     # If its not an input then we can reinplace it
     if node not in inputs:
         return True
     # If its a mutable input then we can reinplace it
     elif node in mutable_inputs:
         return True
-    else: # input but not mutable input
+    else:  # input but not mutable input
         return False
-
 
 
 def _is_user_input(node: torch.fx.Node, exported_program: ExportedProgram) -> bool:
     return node.target in exported_program.graph_signature.user_inputs
 
+
 def _is_buffer(node: torch.fx.Node, exported_program: ExportedProgram) -> bool:
     return node.target in exported_program.graph_signature.inputs_to_buffers
 
-def _is_mutable_user_input(node: torch.fx.Node, exported_program: ExportedProgram) -> bool:
-    return node.target in exported_program.graph_signature.user_inputs_to_mutate.values()
+
+def _is_mutable_user_input(
+    node: torch.fx.Node, exported_program: ExportedProgram
+) -> bool:
+    return (
+        node.target in exported_program.graph_signature.user_inputs_to_mutate.values()
+    )
+
 
 def _is_mutable_buffer(node: torch.fx.Node, exported_program: ExportedProgram) -> bool:
     if node.target not in exported_program.graph_signature.inputs_to_buffers:
@@ -66,14 +72,15 @@ def _is_mutable_buffer(node: torch.fx.Node, exported_program: ExportedProgram) -
     buf = exported_program.graph_signature.inputs_to_buffers[node.target]
     return buf in exported_program.graph_signature.buffers_to_mutate.values()
 
+
 def reinplace_pass(ep: ExportedProgram) -> ExportedProgram:
     """
     Pass that loops over nodes in an exported program and collects the first argument
     of every call_function node that is a view_copy operation.
-    
+
     Args:
         exported_program: The ExportedProgram to analyze
-        
+
     Returns:
         Set of nodes that are first arguments to view_copy operations
     """
@@ -84,8 +91,20 @@ def reinplace_pass(ep: ExportedProgram) -> ExportedProgram:
         if node.op == "placeholder":
             placeholders.add(node)
     # Get all inputs that we could potentially mutate
-    inputs = set([node for node in placeholders if _is_user_input(node, ep) or _is_buffer(node, ep)])
-    mutable_nodes = set([node for node in placeholders if _is_mutable_user_input(node, ep) or _is_mutable_buffer(node, ep)])
+    inputs = set(
+        [
+            node
+            for node in placeholders
+            if _is_user_input(node, ep) or _is_buffer(node, ep)
+        ]
+    )
+    mutable_nodes = set(
+        [
+            node
+            for node in placeholders
+            if _is_mutable_user_input(node, ep) or _is_mutable_buffer(node, ep)
+        ]
+    )
 
     results = set()
     for node in reversed(ep.graph.nodes):
@@ -105,5 +124,5 @@ def reinplace_pass(ep: ExportedProgram) -> ExportedProgram:
                 results.add(first_arg)
         elif node.op == "call_function":
             seen_nodes.update(node.all_input_nodes)
-            
+
     return ep
