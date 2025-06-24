@@ -39,7 +39,6 @@ def _is_safe_to_reinplace(
     # There is probably a faster way to do this but this works for now.
     if node in later_nodes:
         return False
-
     # If its not an input then we can reinplace it
     if node not in inputs:
         return True
@@ -124,5 +123,4 @@ def reinplace_pass(ep: ExportedProgram) -> ExportedProgram:
                 results.add(first_arg)
         elif node.op == "call_function":
             seen_nodes.update(node.all_input_nodes)
-
     return ep
